@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-nb"
-version = "0.5.24.dev0"
+version = "0.5.25.dev0"
 description = "Multi-agent coordination framework for Claude Code sessions"
 requires-python = ">=3.11"
 license = "LicenseRef-OpenAll-1.0"

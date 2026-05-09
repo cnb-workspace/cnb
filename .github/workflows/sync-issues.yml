@@ -14,8 +14,12 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      ISSUE_SOURCE_REPO: ${{ vars.ISSUE_SOURCE_REPO || github.repository }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Sync issues to /issues directory
         env:
@@ -23,121 +27,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          mkdir -p issues
-
-          # Fetch all open issues as JSON
-          gh issue list --state all --limit 200 --json number,title,state,body,labels,assignees,createdAt,updatedAt,closedAt \
-            | python3 -c "
-          import json, re, sys
-
-          issues = json.load(sys.stdin)
-
-          # Track which files should exist
-          expected_files = set()
-
-          for issue in issues:
-              num = issue['number']
-              title = issue['title']
-              state = issue['state']
-              body = issue.get('body') or ''
-              labels = ', '.join(l['name'] for l in issue.get('labels', []))
-              assignees = ', '.join(a['login'] for a in issue.get('assignees', []))
-              created = issue.get('createdAt', '')[:10]
-              updated = issue.get('updatedAt', '')[:10]
-              closed = issue.get('closedAt') or ''
-              if closed:
-                  closed = closed[:10]
-
-              # Slug from title
-              slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:60]
-              filename = f'issues/{num:03d}-{slug}.md'
-              expected_files.add(filename)
-
-              state_badge = 'OPEN' if state == 'OPEN' else 'CLOSED'
-
-              content = f'''---
-number: {num}
-title: \"{title}\"
-state: {state_badge}
-labels: [{labels}]
-assignees: [{assignees}]
-created: {created}
-updated: {updated}
-'''
-              if closed:
-                  content += f'closed: {closed}\n'
-              content += f'''---
-
-# #{num} {title}
-
-**State:** {state_badge}
-'''
-              if labels:
-                  content += f'**Labels:** {labels}\n'
-              if assignees:
-                  content += f'**Assignees:** {assignees}\n'
-              content += f'''
----
-
-{body}
-'''
-
-              with open(filename, 'w') as f:
-                  f.write(content)
-
-          # Remove files for issues that no longer exist
-          import glob
-          for existing in glob.glob('issues/*.md'):
-              if existing != 'issues/README.md' and existing not in expected_files:
-                  import os
-                  os.remove(existing)
-                  print(f'Removed stale: {existing}')
-
-          print(f'Synced {len(issues)} issues')
-          "
-
-      - name: Generate issues index
-        run: |
-          python3 -c "
-          import glob, re
-
-          files = sorted(glob.glob('issues/[0-9]*.md'))
-
-          open_issues = []
-          closed_issues = []
-
-          for f in files:
-              with open(f) as fh:
-                  text = fh.read()
-              num_m = re.search(r'^number: (\d+)', text, re.MULTILINE)
-              title_m = re.search(r'^title: \"(.+)\"', text, re.MULTILINE)
-              state_m = re.search(r'^state: (\w+)', text, re.MULTILINE)
-              if not (num_m and title_m and state_m):
-                  continue
-              num = int(num_m.group(1))
-              title = title_m.group(1)
-              state = state_m.group(1)
-              fname = f.split('/')[-1]
-              entry = f'| [#{num}]({fname}) | {title} |'
-              if state == 'OPEN':
-                  open_issues.append(entry)
-              else:
-                  closed_issues.append(entry)
-
-          with open('issues/README.md', 'w') as out:
-              out.write('# Issues\n\n')
-              out.write('Auto-synced from GitHub Issues. Updated every 6 hours and on every issue event.\n\n')
-              out.write('## Open\n\n')
-              out.write('| Issue | Title |\n|-------|-------|\n')
-              for e in open_issues:
-                  out.write(e + '\n')
-              out.write(f'\n## Closed\n\n')
-              out.write('| Issue | Title |\n|-------|-------|\n')
-              for e in closed_issues:
-                  out.write(e + '\n')
-
-          print(f'Index: {len(open_issues)} open, {len(closed_issues)} closed')
-          "
+          gh issue list \
+            --repo "$ISSUE_SOURCE_REPO" \
+            --state all \
+            --limit 1000 \
+            --json number,title,state,body,labels,assignees,createdAt,updatedAt,closedAt \
+            > /tmp/issues.json
+          python -m lib.github_issues_sync --issues-dir issues --source-repo "$ISSUE_SOURCE_REPO" /tmp/issues.json
 
       - name: Commit and push
         run: |
@@ -150,5 +46,5 @@ updated: {updated}
             git commit -m "sync: update issues from GitHub
 
           Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
-            git push
+            git push origin HEAD:${{ github.event.repository.default_branch }}
           fi
