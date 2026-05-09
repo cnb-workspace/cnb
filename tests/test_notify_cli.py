@@ -124,6 +124,14 @@ class TestCmdSubscriptions:
         assert "alice" in out
         assert "bob" in out
 
+    def test_all_members_includes_human_recipient(self, env, capsys):
+        config_path = env.claudes_dir / "notifications.toml"
+        config_path.write_text('[human]\nname = "Test User"\nemail = "test@example.com"\n')
+        notify_mod.cmd_subscriptions(None)
+        out = capsys.readouterr().out
+        assert "human" in out
+        assert "via lark-im" in out
+
     def test_no_sessions(self, env, capsys):
         conn = sqlite3.connect(str(env.board_db))
         conn.execute("DELETE FROM sessions")
@@ -167,6 +175,13 @@ class TestCmdDigest:
         notify_mod.cmd_digest(send=True)
         out = capsys.readouterr().out
         assert "无订阅者" in out
+
+    def test_digest_send_reports_human_channel(self, env, capsys):
+        config_path = env.claudes_dir / "notifications.toml"
+        config_path.write_text('[human]\nname = "Test User"\nemail = "test@example.com"\ndaily-digest = true\n')
+        notify_mod.cmd_digest(send=True)
+        out = capsys.readouterr().out
+        assert "human: 通道 lark-im 尚未实现" in out
 
     def test_missing_db_exits(self, env):
         env.board_db.unlink()
@@ -278,6 +293,13 @@ class TestCmdWeekly:
         notify_mod.cmd_weekly(send=True)
         out = capsys.readouterr().out
         assert "无订阅者" in out
+
+    def test_weekly_send_reports_human_channel(self, env, capsys):
+        config_path = env.claudes_dir / "notifications.toml"
+        config_path.write_text('[human]\nname = "Test User"\nemail = "test@example.com"\nweekly-report = true\n')
+        notify_mod.cmd_weekly(send=True)
+        out = capsys.readouterr().out
+        assert "human: 通道 lark-im 尚未实现" in out
 
     def test_missing_db_exits(self, env):
         env.board_db.unlink()

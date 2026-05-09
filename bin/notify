@@ -75,11 +75,13 @@ def cmd_subscriptions(member: str | None = None) -> None:
             raise SystemExit(1)
         board = BoardDB(db_path)
         sessions = board.query("SELECT name FROM sessions ORDER BY name")
-        if not sessions:
+        names = [row[0] for row in (sessions or [])]
+        if config.human:
+            names.append("human")
+        if not names:
             print("无会话")
             return
-        for row in sessions:
-            name = row[0]
+        for name in names:
             subs = [t for t in NOTIFICATION_TYPES if config.is_subscribed(name, t)]
             channel = config.channel_for(name)
             subs_str = ", ".join(subs) if subs else "无"

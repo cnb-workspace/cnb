@@ -64,6 +64,25 @@ class TestIsSubscribed:
         assert cfg.is_subscribed("bob", "weekly-report") is True
         assert cfg.is_subscribed("alice", "weekly-report") is False
 
+    def test_member_lookup_is_case_insensitive(self):
+        cfg = NotificationConfig(
+            defaults=dict(BUILTIN_DEFAULTS),
+            overrides={"alice": {"daily-digest": False}},
+        )
+        assert cfg.is_subscribed("Alice", "daily-digest") is False
+
+    def test_human_subscription_overrides_defaults(self):
+        cfg = NotificationConfig(
+            defaults=dict(BUILTIN_DEFAULTS),
+            human=HumanRecipient(
+                name="Test",
+                email="test@example.com",
+                subscriptions={"daily-digest": False, "weekly-report": True},
+            ),
+        )
+        assert cfg.is_subscribed("human", "daily-digest") is False
+        assert cfg.is_subscribed("human", "weekly-report") is True
+
 
 class TestChannelFor:
     def test_teammate_gets_teammate_channel(self):
@@ -121,6 +140,34 @@ class TestSubscribersFor:
         cfg = NotificationConfig(defaults={"ci-alert": True})
         result = cfg.subscribers_for("ci-alert", ["alice", "bob"])
         assert result == ["alice", "bob"]
+
+    def test_includes_configured_human(self):
+        cfg = NotificationConfig(
+            defaults=dict(BUILTIN_DEFAULTS),
+            human=HumanRecipient(name="Human", email="human@example.com"),
+        )
+        result = cfg.subscribers_for("daily-digest", ["alice", "bob"])
+        assert result == ["alice", "bob", "human"]
+
+    def test_human_subscription_can_disable_default(self):
+        cfg = NotificationConfig(
+            defaults=dict(BUILTIN_DEFAULTS),
+            human=HumanRecipient(
+                name="Human",
+                email="human@example.com",
+                subscriptions={"daily-digest": False},
+            ),
+        )
+        result = cfg.subscribers_for("daily-digest", ["alice"])
+        assert result == ["alice"]
+
+    def test_deduplicates_human_member(self):
+        cfg = NotificationConfig(
+            defaults=dict(BUILTIN_DEFAULTS),
+            human=HumanRecipient(name="Human", email="human@example.com"),
+        )
+        result = cfg.subscribers_for("daily-digest", ["alice", "human"])
+        assert result == ["alice", "human"]
 
 
 class TestLoadMissingFile:
@@ -255,4 +302,4 @@ class TestLoadFullConfig:
         assert cfg.channel_for("human") == "gmail"
         assert cfg.channel_for("alice") == "board-inbox"
         subs = cfg.subscribers_for("daily-digest", ["alice", "bob"])
-        assert subs == ["alice", "bob"]
+        assert subs == ["alice", "bob", "human"]

@@ -163,6 +163,24 @@ class TestDailyDigest:
         msg = mock_send.call_args[0][2]
         assert "[Daily Digest]" in msg
 
+    @patch("lib.concerns.digest_scheduler.get_dev_sessions", return_value=["alice"])
+    @patch("lib.concerns.digest_scheduler.board_send")
+    def test_records_human_subscriber_without_board_send(self, mock_send, mock_sessions, tmp_path):
+        cfg = _make_cfg(tmp_path)
+        conn = _init_db(cfg.board_db)
+        toml = cfg.claudes_dir / "notifications.toml"
+        toml.write_text('[human]\nname = "Test User"\nemail = "test@example.com"\ndaily-digest = true\n')
+        sched = DigestScheduler(cfg)
+
+        sched._send_daily("2026-05-08")
+
+        mock_send.assert_called_once()
+        recipients = conn.execute(
+            "SELECT recipient, channel FROM notification_log WHERE notif_type='daily-digest' ORDER BY recipient"
+        ).fetchall()
+        assert [(r[0], r[1]) for r in recipients] == [("alice", "board-inbox"), ("human", "lark-im")]
+        conn.close()
+
 
 class TestWeeklyReport:
     @patch("lib.concerns.digest_scheduler.get_dev_sessions", return_value=["alice"])

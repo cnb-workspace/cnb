@@ -257,6 +257,28 @@ class TestScanMentions:
         concern._scan_mentions(config)
         mock_send.assert_not_called()
 
+    @patch("lib.concerns.notification_push.get_dev_sessions", return_value=[])
+    @patch("lib.concerns.notification_push.board_send")
+    @patch("lib.concerns.notification_push.log")
+    def test_human_mention_uses_human_channel(self, mock_log, mock_send, mock_sessions, tmp_path):
+        cfg = _make_cfg(tmp_path)
+        conn = _init_db(cfg.board_db)
+        toml = cfg.claudes_dir / "notifications.toml"
+        toml.write_text('[human]\nname = "Boss"\nemail = "boss@example.com"\nmention = true\n')
+        concern = NotificationPushConcern(cfg)
+
+        conn.execute("INSERT INTO messages(sender,recipient,body) VALUES ('alice','all','cc @human')")
+        conn.commit()
+
+        config = concern._load_config()
+        concern._scan_mentions(config)
+
+        mock_send.assert_not_called()
+        mock_log.assert_called()
+        row = conn.execute("SELECT recipient, channel FROM notification_log WHERE notif_type='mention'").fetchone()
+        assert tuple(row) == ("human", "lark-im")
+        conn.close()
+
 
 class TestScanBugs:
     @patch("lib.concerns.notification_push.get_dev_sessions", return_value=["alice", "bob"])
