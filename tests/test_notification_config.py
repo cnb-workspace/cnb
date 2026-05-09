@@ -247,11 +247,16 @@ class TestLoadOverrides:
 class TestLoadHuman:
     def test_reads_human_section(self, tmp_path):
         toml = tmp_path / "notifications.toml"
-        toml.write_text('[human]\nname = "Zhang"\nemail = "z@example.com"\ndaily-digest = true\nweekly-report = true\n')
+        toml.write_text(
+            '[human]\nname = "Zhang"\nemail = "z@example.com"\nlark_chat_id = "oc_123"\n'
+            'lark_user_id = "ou_123"\ndaily-digest = true\nweekly-report = true\n'
+        )
         cfg = load(toml)
         assert cfg.human is not None
         assert cfg.human.name == "Zhang"
         assert cfg.human.email == "z@example.com"
+        assert cfg.human.lark_chat_id == "oc_123"
+        assert cfg.human.lark_user_id == "ou_123"
         assert cfg.human.subscriptions["daily-digest"] is True
         assert cfg.human.subscriptions["weekly-report"] is True
 

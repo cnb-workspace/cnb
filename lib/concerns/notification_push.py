@@ -8,6 +8,7 @@ from pathlib import Path
 
 from lib.notification_config import NotificationConfig
 from lib.notification_config import load as load_config
+from lib.notification_delivery import deliver_external
 
 from .base import Concern
 from .config import DispatcherConfig
@@ -75,9 +76,15 @@ class NotificationPushConcern(Concern):
         channel = config.channel_for(recipient)
         if channel == "board-inbox":
             board_send(self.cfg, recipient, message)
+            self._record(notif_type, recipient, "message" if notif_type == "mention" else "bug", ref_id, channel)
+            return
+
+        result = deliver_external(config, recipient, channel, notif_type, message, ref_id)
+        if result.delivered:
+            log(f"[notify] {result.detail} for {recipient}")
+            self._record(notif_type, recipient, "message" if notif_type == "mention" else "bug", ref_id, channel)
         else:
-            log(f"[notify] {channel} delivery not yet implemented for {recipient}: {message[:60]}")
-        self._record(notif_type, recipient, "message" if notif_type == "mention" else "bug", ref_id, channel)
+            log(f"[notify] {recipient}: {result.detail}")
 
     def _scan_mentions(self, config: NotificationConfig) -> None:
         try:

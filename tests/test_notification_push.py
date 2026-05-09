@@ -2,7 +2,7 @@
 
 import sqlite3
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from lib.concerns.config import DispatcherConfig
 from lib.concerns.notification_push import MENTION_RE, NotificationPushConcern
@@ -260,7 +260,32 @@ class TestScanMentions:
     @patch("lib.concerns.notification_push.get_dev_sessions", return_value=[])
     @patch("lib.concerns.notification_push.board_send")
     @patch("lib.concerns.notification_push.log")
-    def test_human_mention_uses_human_channel(self, mock_log, mock_send, mock_sessions, tmp_path):
+    @patch("lib.notification_delivery.subprocess.run")
+    def test_human_mention_uses_human_channel(self, mock_run, mock_log, mock_send, mock_sessions, tmp_path):
+        cfg = _make_cfg(tmp_path)
+        conn = _init_db(cfg.board_db)
+        toml = cfg.claudes_dir / "notifications.toml"
+        toml.write_text('[human]\nname = "Boss"\nemail = "boss@example.com"\nlark_chat_id = "oc_123"\nmention = true\n')
+        mock_run.return_value = Mock(returncode=0, stdout="{}", stderr="")
+        concern = NotificationPushConcern(cfg)
+
+        conn.execute("INSERT INTO messages(sender,recipient,body) VALUES ('alice','all','cc @human')")
+        conn.commit()
+
+        config = concern._load_config()
+        concern._scan_mentions(config)
+
+        mock_send.assert_not_called()
+        mock_run.assert_called_once()
+        mock_log.assert_called()
+        row = conn.execute("SELECT recipient, channel FROM notification_log WHERE notif_type='mention'").fetchone()
+        assert tuple(row) == ("human", "lark-im")
+        conn.close()
+
+    @patch("lib.concerns.notification_push.get_dev_sessions", return_value=[])
+    @patch("lib.concerns.notification_push.board_send")
+    @patch("lib.concerns.notification_push.log")
+    def test_human_mention_without_lark_target_is_not_recorded(self, mock_log, mock_send, mock_sessions, tmp_path):
         cfg = _make_cfg(tmp_path)
         conn = _init_db(cfg.board_db)
         toml = cfg.claudes_dir / "notifications.toml"
@@ -275,8 +300,8 @@ class TestScanMentions:
 
         mock_send.assert_not_called()
         mock_log.assert_called()
-        row = conn.execute("SELECT recipient, channel FROM notification_log WHERE notif_type='mention'").fetchone()
-        assert tuple(row) == ("human", "lark-im")
+        count = conn.execute("SELECT COUNT(*) FROM notification_log WHERE notif_type='mention'").fetchone()[0]
+        assert count == 0
         conn.close()
 
 

@@ -181,7 +181,7 @@ class TestCmdDigest:
         config_path.write_text('[human]\nname = "Test User"\nemail = "test@example.com"\ndaily-digest = true\n')
         notify_mod.cmd_digest(send=True)
         out = capsys.readouterr().out
-        assert "human: 通道 lark-im 尚未实现" in out
+        assert "human: lark-im requires human.lark_chat_id or human.lark_user_id" in out
 
     def test_missing_db_exits(self, env):
         env.board_db.unlink()
@@ -299,7 +299,7 @@ class TestCmdWeekly:
         config_path.write_text('[human]\nname = "Test User"\nemail = "test@example.com"\nweekly-report = true\n')
         notify_mod.cmd_weekly(send=True)
         out = capsys.readouterr().out
-        assert "human: 通道 lark-im 尚未实现" in out
+        assert "human: lark-im requires human.lark_chat_id or human.lark_user_id" in out
 
     def test_missing_db_exits(self, env):
         env.board_db.unlink()

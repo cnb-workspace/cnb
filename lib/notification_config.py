@@ -22,6 +22,8 @@ BUILTIN_DEFAULTS: dict[str, bool] = {
 class HumanRecipient:
     name: str
     email: str
+    lark_user_id: str = ""
+    lark_chat_id: str = ""
     subscriptions: dict[str, bool] = field(default_factory=dict)
 
 
@@ -105,6 +107,8 @@ def load(config_path: Path) -> NotificationConfig:
         human = HumanRecipient(
             name=h.get("name", ""),
             email=h.get("email", ""),
+            lark_user_id=h.get("lark_user_id", h.get("lark-user-id", "")),
+            lark_chat_id=h.get("lark_chat_id", h.get("lark-chat-id", "")),
             subscriptions=human_subs,
         )
 

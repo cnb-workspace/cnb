@@ -7,6 +7,7 @@ from pathlib import Path
 
 from lib.digest import generate_daily_digest, generate_weekly_report
 from lib.notification_config import load as load_config
+from lib.notification_delivery import deliver_external
 
 from .base import Concern
 from .config import DispatcherConfig
@@ -83,9 +84,13 @@ class DigestScheduler(Concern):
             channel = config.channel_for(member)
             if channel == "board-inbox":
                 board_send(self.cfg, member, digest_text)
-            else:
-                log(f"[digest] {channel} delivery not implemented for {member}")
-            self._record_digest("daily-digest", member, date_str, channel)
+                self._record_digest("daily-digest", member, date_str, channel)
+                continue
+
+            result = deliver_external(config, member, channel, "daily-digest", digest_text, f"digest-{date_str}")
+            if result.delivered:
+                self._record_digest("daily-digest", member, date_str, channel)
+            log(f"[digest] {member}: {result.detail}")
 
         log(f"Daily digest sent to {len(subscribers)} subscribers")
 
@@ -112,8 +117,12 @@ class DigestScheduler(Concern):
             channel = config.channel_for(member)
             if channel == "board-inbox":
                 board_send(self.cfg, member, report_text)
-            else:
-                log(f"[digest] {channel} delivery not implemented for {member}")
-            self._record_digest("weekly-report", member, date_str, channel)
+                self._record_digest("weekly-report", member, date_str, channel)
+                continue
+
+            result = deliver_external(config, member, channel, "weekly-report", report_text, f"digest-{date_str}")
+            if result.delivered:
+                self._record_digest("weekly-report", member, date_str, channel)
+            log(f"[digest] {member}: {result.detail}")
 
         log(f"Weekly report sent to {len(subscribers)} subscribers")

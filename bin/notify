@@ -20,6 +20,7 @@ from lib.board_db import BoardDB
 from lib.common import ClaudesEnv
 from lib.digest import generate_daily_digest, generate_weekly_report
 from lib.notification_config import BUILTIN_DEFAULTS, NOTIFICATION_TYPES, load
+from lib.notification_delivery import deliver_external
 
 
 def _env() -> ClaudesEnv:
@@ -155,7 +156,10 @@ def cmd_digest(send: bool = False) -> None:
                 except Exception:
                     print(f"ERROR: 发送到 {member} 失败")
             else:
-                print(f"  {member}: 通道 {channel} 尚未实现")
+                result = deliver_external(config, member, channel, "daily-digest", digest, "manual-digest")
+                if result.delivered:
+                    sent += 1
+                print(f"  {member}: {result.detail}")
         print(f"\nOK 已发送到 {sent}/{len(subscribers)} 订阅者")
 
 
@@ -196,7 +200,10 @@ def cmd_weekly(send: bool = False) -> None:
                 except Exception:
                     print(f"ERROR: 发送到 {member} 失败")
             else:
-                print(f"  {member}: 通道 {channel} 尚未实现")
+                result = deliver_external(config, member, channel, "weekly-report", report, "manual-weekly")
+                if result.delivered:
+                    sent += 1
+                print(f"  {member}: {result.detail}")
         print(f"\nOK 已发送到 {sent}/{len(subscribers)} 订阅者")
 
 

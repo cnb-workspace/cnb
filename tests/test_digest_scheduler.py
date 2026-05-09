@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from lib.concerns.config import DispatcherConfig
 from lib.concerns.digest_scheduler import DigestScheduler
@@ -165,11 +165,15 @@ class TestDailyDigest:
 
     @patch("lib.concerns.digest_scheduler.get_dev_sessions", return_value=["alice"])
     @patch("lib.concerns.digest_scheduler.board_send")
-    def test_records_human_subscriber_without_board_send(self, mock_send, mock_sessions, tmp_path):
+    @patch("lib.notification_delivery.subprocess.run")
+    def test_records_human_lark_im_subscriber(self, mock_run, mock_send, mock_sessions, tmp_path):
         cfg = _make_cfg(tmp_path)
         conn = _init_db(cfg.board_db)
         toml = cfg.claudes_dir / "notifications.toml"
-        toml.write_text('[human]\nname = "Test User"\nemail = "test@example.com"\ndaily-digest = true\n')
+        toml.write_text(
+            '[human]\nname = "Test User"\nemail = "test@example.com"\nlark_chat_id = "oc_123"\ndaily-digest = true\n'
+        )
+        mock_run.return_value = Mock(returncode=0, stdout="{}", stderr="")
         sched = DigestScheduler(cfg)
 
         sched._send_daily("2026-05-08")
@@ -179,6 +183,23 @@ class TestDailyDigest:
             "SELECT recipient, channel FROM notification_log WHERE notif_type='daily-digest' ORDER BY recipient"
         ).fetchall()
         assert [(r[0], r[1]) for r in recipients] == [("alice", "board-inbox"), ("human", "lark-im")]
+        conn.close()
+
+    @patch("lib.concerns.digest_scheduler.get_dev_sessions", return_value=["alice"])
+    @patch("lib.concerns.digest_scheduler.board_send")
+    def test_skips_unconfigured_human_lark_im_record(self, mock_send, mock_sessions, tmp_path):
+        cfg = _make_cfg(tmp_path)
+        conn = _init_db(cfg.board_db)
+        toml = cfg.claudes_dir / "notifications.toml"
+        toml.write_text('[human]\nname = "Test User"\nemail = "test@example.com"\ndaily-digest = true\n')
+        sched = DigestScheduler(cfg)
+
+        sched._send_daily("2026-05-08")
+
+        recipients = conn.execute(
+            "SELECT recipient, channel FROM notification_log WHERE notif_type='daily-digest' ORDER BY recipient"
+        ).fetchall()
+        assert [(r[0], r[1]) for r in recipients] == [("alice", "board-inbox")]
         conn.close()
 
 
