@@ -17,7 +17,9 @@
 - App ID: `3660379`
 - 管理组织内已安装 installation: `130989940`
 - 当前允许的管理仓库: `cnb-workspace/cnb`
-- 计划允许的 canonical 仓库: `ApolloZhangOnGithub/cnb`
+- canonical 仓库 installation: `130997703`
+- 当前允许的 canonical 仓库: `ApolloZhangOnGithub/cnb`
+- 可见动作验证: `https://github.com/ApolloZhangOnGithub/cnb/issues/65#issuecomment-4414136928`
 
 ## Public 前检查
 
